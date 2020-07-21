@@ -1195,6 +1195,14 @@ class Model
     /**
      * @return bool
      */
+    public function usesBaseFilesAsAbstract()
+    {
+        return $this->config('base_files_abstract', false);
+    } 
+
+    /**
+     * @return bool
+     */
     public function usesPropertyConstants()
     {
         return $this->config('with_property_constants', false);

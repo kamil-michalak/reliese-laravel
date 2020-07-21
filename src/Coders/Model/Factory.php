@@ -250,6 +250,7 @@ class Factory
      */
     protected function fillTemplate($template, Model $model)
     {
+        $template = str_replace('{{abstract}}',$model->usesBaseFilesAsAbstract() ? 'abstract ' : '',$template);
         $template = str_replace('{{namespace}}', $model->getBaseNamespace(), $template);
         $template = str_replace('{{class}}', $model->getClassName(), $template);
 
@@ -450,11 +451,11 @@ class Factory
             $body .= $this->class->field('dates', $model->getDates(), ['before' => "\n"]);
         }
 
-        if ($model->hasHidden() && $model->doesNotUseBaseFiles()) {
+        if ($model->hasHidden()) {
             $body .= $this->class->field('hidden', $model->getHidden(), ['before' => "\n"]);
         }
 
-        if ($model->hasFillable() && $model->doesNotUseBaseFiles()) {
+        if ($model->hasFillable()) {
             $body .= $this->class->field('fillable', $model->getFillable(), ['before' => "\n"]);
         }
 
