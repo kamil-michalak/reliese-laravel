@@ -717,7 +717,7 @@ class Model
      */
     public function needsTableName()
     {
-        return false === $this->shouldQualifyTableName() ||
+        return null === $this->shouldQualifyTableName() ||
             $this->shouldRemoveTablePrefix() ||
             $this->blueprint->table() != Str::plural($this->getRecordName()) ||
             ! $this->shouldPluralizeTableName();
