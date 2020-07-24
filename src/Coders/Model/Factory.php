@@ -80,7 +80,7 @@ class Factory
      */
     protected function models()
     {
-        if (! isset($this->models)) {
+        if (!isset($this->models)) {
             $this->models = new ModelManager($this);
         }
 
@@ -106,7 +106,7 @@ class Factory
      */
     public function map($schema)
     {
-        if (! isset($this->schemas)) {
+        if (!isset($this->schemas)) {
             $this->on();
         }
 
@@ -170,7 +170,7 @@ class Factory
             $file = str_replace("\t", str_repeat(' ', $model->indentWithSpace()), $file);
         }
 
-        $this->files->put($this->modelPath($model, $model->usesBaseFiles() ? ['Base'] : []), $file);
+        $this->files->put($this->modelPath($model, $model->usesBaseFiles() ? ['Base', $model->getNamespacePrefix()] : [$model->getNamespacePrefix()]), $file);
 
         if ($this->needsUserFile($model)) {
             $this->createUserFile($model);
@@ -250,7 +250,7 @@ class Factory
      */
     protected function fillTemplate($template, Model $model)
     {
-        $template = str_replace('{{abstract}}',$model->usesBaseFilesAsAbstract() ? 'abstract ' : '',$template);
+        $template = str_replace('{{abstract}}', $model->usesBaseFilesAsAbstract() ? 'abstract ' : '', $template);
         $template = str_replace('{{namespace}}', $model->getBaseNamespace(), $template);
         $template = str_replace('{{class}}', $model->getClassName(), $template);
 
@@ -269,7 +269,7 @@ class Factory
         $usedClasses = array_unique($usedClasses);
         $usedClassesSection = $this->formatUsedClasses(
             $model->getBaseNamespace(),
-            $usedClasses, 
+            $usedClasses,
             $model->getClassName()
         );
         $template = str_replace('{{imports}}', $usedClassesSection, $template);
@@ -291,15 +291,15 @@ class Factory
         foreach ($usedClasses as $usedClass) {
             // Do not import classes from same namespace
             $namespacePattern = str_replace('\\', '\\\\', "/{$baseNamespace}\\[a-zA-Z0-9_]*/");
-            if (! preg_match($namespacePattern, $usedClass)) {
-                
-                    //Do not import classes with same name of className
-                    preg_match('/\\\\[^\\\\]*$/', $usedClass, $matches, PREG_OFFSET_CAPTURE, 0);
-                    $usedClassName = str_replace("\\", "", $matches[0][0]);
+            if (!preg_match($namespacePattern, $usedClass)) {
 
-                    if($usedClassName != $className){
-                        $result[] = "use {$usedClass};";
-                    }
+                //Do not import classes with same name of className
+                preg_match('/\\\\[^\\\\]*$/', $usedClass, $matches, PREG_OFFSET_CAPTURE, 0);
+                $usedClassName = str_replace("\\", "", $matches[0][0]);
+
+                if ($usedClassName != $className) {
+                    $result[] = "use {$usedClass};";
+                }
             }
         }
 
@@ -357,7 +357,7 @@ class Factory
             if ($model->hasProperty($name)) {
                 continue;
             }
-            $annotations .= $this->class->annotation('property', $relation->hint()." \$$name");
+            $annotations .= $this->class->annotation('property', $relation->hint() . " \$$name");
         }
 
         return $annotations;
@@ -405,7 +405,7 @@ class Factory
 
         $body = trim($body, "\n");
         // Separate constants from fields only if there are constants.
-        if (! empty($body)) {
+        if (!empty($body)) {
             $body .= "\n";
         }
 
@@ -431,7 +431,7 @@ class Factory
             $body .= $this->class->field('perPage', $model->getPerPage());
         }
 
-        if (! $model->usesTimestamps()) {
+        if (!$model->usesTimestamps()) {
             $body .= $this->class->field('timestamps', false, ['visibility' => 'public']);
         }
 
@@ -487,11 +487,11 @@ class Factory
     {
         $modelsDirectory = $this->path(array_merge([$this->config($model->getBlueprint(), 'path')], $custom));
 
-        if (! $this->files->isDirectory($modelsDirectory)) {
+        if (!$this->files->isDirectory($modelsDirectory)) {
             $this->files->makeDirectory($modelsDirectory, 0755, true);
         }
 
-        return $this->path([$modelsDirectory, $model->getClassName().'.php']);
+        return $this->path([$modelsDirectory, $model->getClassName() . '.php']);
     }
 
     /**
@@ -511,7 +511,7 @@ class Factory
      */
     public function needsUserFile(Model $model)
     {
-        return ! $this->files->exists($this->modelPath($model)) && $model->usesBaseFiles();
+        return !$this->files->exists($this->modelPath($model, [$model->getNamespacePrefix()])) && $model->usesBaseFiles();
     }
 
     /**
@@ -521,7 +521,7 @@ class Factory
      */
     protected function createUserFile(Model $model)
     {
-        $file = $this->modelPath($model);
+        $file = $this->modelPath($model, [$model->getNamespacePrefix()]);
 
         $template = $this->prepareTemplate($model, 'user_model');
         $template = str_replace('{{namespace}}', $model->getNamespace(), $template);
@@ -548,7 +548,7 @@ class Factory
      */
     private function getBaseClassName(Model $model)
     {
-        return 'Base'.$model->getClassName();
+        return 'Base' . $model->getClassName();
     }
 
     /**
