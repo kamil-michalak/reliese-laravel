@@ -321,6 +321,9 @@ class Factory
                 $className = array_pop($namespacePieces);
 
                 //When same class name but different namespace, skip it.
+                if ($model->getClassName() === $className) {
+                    continue;
+                }
                 if (
                     $className == $model->getClassName() &&
                     trim(implode('\\', $namespacePieces), '\\') != trim($model->getNamespace(), '\\')
