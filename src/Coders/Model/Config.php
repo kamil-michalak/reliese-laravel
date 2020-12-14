@@ -36,10 +36,23 @@ class Config
      */
     public function get(Blueprint $blueprint, $key, $default = null)
     {
-        $default = Arr::get($this->config, "*.$key", $default);
-        $schema = Arr::get($this->config, "{$blueprint->schema()}.$key", $default);
-        $specific = Arr::get($this->config, "{$blueprint->qualifiedTable()}.$key", $schema);
+        $priorityKeys = [
+            "@connections.{$blueprint->connection()}.{$blueprint->table()}.$key",
+            "@connections.{$blueprint->connection()}.{$blueprint->schema()}.$key",
+            "@connections.{$blueprint->connection()}.$key",
+            "{$blueprint->qualifiedTable()}.$key",
+            "{$blueprint->schema()}.$key",
+            "*.$key",
+        ];
 
-        return $specific;
+        foreach ($priorityKeys as $key) {
+            $value = Arr::get($this->config, $key);
+
+            if (!is_null($value)) {
+                return $value;
+            }
+        }
+
+        return $default;
     }
 }
