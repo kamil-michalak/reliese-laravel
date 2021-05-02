@@ -529,6 +529,13 @@ class Model
      */
     public function getClassName()
     {
+        // Model names can be manually overridden by users in the config file.
+        // If a config entry exists for this table, use that name, rather than generating one.
+        $overriddenName = $this->config('model_names.' . $this->getTable());
+        if ($overriddenName) {
+            return $overriddenName;
+        }
+
         if ($this->shouldLowerCaseTableName()) {
             return Str::studly(Str::lower($this->getRecordName()));
         }
@@ -1249,5 +1256,13 @@ class Model
     public function config($key = null, $default = null)
     {
         return $this->factory->config($this->getBlueprint(), $key, $default);
+    }
+
+    /**
+     * @return bool
+     */
+    public function fillableInBaseFiles(): bool
+    {
+        return $this->config('fillable_in_base_files', false);
     }
 }

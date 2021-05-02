@@ -1,13 +1,14 @@
-# Reliese Laravel
+# Reliese Laravel Model Generator
 [![Build Status](https://travis-ci.org/reliese/laravel.svg?branch=master)](https://travis-ci.org/reliese/laravel)
 [![Latest Stable Version](https://poser.pugx.org/reliese/laravel/v/stable)](https://packagist.org/packages/reliese/laravel)
 [![Total Downloads](https://poser.pugx.org/reliese/laravel/downloads)](https://packagist.org/packages/reliese/laravel)
 [![Latest Unstable Version](https://poser.pugx.org/reliese/laravel/v/unstable)](https://packagist.org/packages/reliese/laravel)
 [![License](https://poser.pugx.org/reliese/laravel/license)](https://packagist.org/packages/reliese/laravel)
 
-Reliese Laravel is a collection of Laravel Components which aim is 
-to help the development process of Laravel applications by 
-providing some convenient code-generation capabilities.
+Reliese Laravel Model Generator aims to speed up the development process of Laravel applications by 
+providing some convenient code-generation capabilities. 
+The tool inspects your database structure, including column names and foreign keys, in order 
+to automatically generate Models that have correctly typed properties, along with any relationships to other Models.
 
 ## How does it work?
 
@@ -22,27 +23,18 @@ It is recommended that this package should only be used on a local environment f
 composer require reliese/laravel --dev
 ```
 
-Then you'll need to register the provider in `app/Providers/AppServiceProvider.php` file.
+Add the `models.php` configuration file to your `config` directory and clear the config cache:
 
-```php
-public function register()
-{
-    if ($this->app->environment() == 'local') {
-        $this->app->register(\Reliese\Coders\CodersServiceProvider::class);
-    }
-}
+```shell
+php artisan vendor:publish --tag=reliese-models
+
+# Let's refresh our config cache just in case
+php artisan config:clear
 ```
 
 ## Models
 
 ![Generating models with artisan](https://cdn-images-1.medium.com/max/800/1*hOa2QxORE2zyO_-ZqJ40sA.png "Making artisan code my Eloquent models")
-
-Add the `models.php` configuration file to your `config` directory and clear the config cache:
-
-```shell
-php artisan vendor:publish --tag=reliese-models
-php artisan config:clear
-```
 
 ### Usage
 
