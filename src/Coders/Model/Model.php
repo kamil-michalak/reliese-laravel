@@ -1210,6 +1210,11 @@ class Model
         return $this->config('with_property_constants', false);
     }
 
+    public function usesColumnList()
+    {
+        return $this->config('with_column_list', false);
+    }
+
     /**
      * @return int
      */

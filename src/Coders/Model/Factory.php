@@ -455,6 +455,13 @@ class Factory
             $body .= $this->class->field('snakeAttributes', false, ['visibility' => 'public static']);
         }
 
+        if ($model->usesColumnList()) {
+            $properties = array_keys($model->getProperties());
+
+            $body .= "\n";
+            $body .= $this->class->field('columns', $properties);
+        }
+
         if ($model->hasCasts()) {
             $body .= $this->class->field('casts', $model->getCasts(), ['before' => "\n"]);
         }
