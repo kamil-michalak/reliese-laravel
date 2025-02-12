@@ -337,7 +337,7 @@ class Factory
                 }
 
                 $importableDependencies[trim($usedClass, '\\')] = true;
-                $placeholder = str_replace($usedClass, $className, $placeholder);
+                $placeholder = preg_replace('!'.addslashes($usedClass).'\b!', addslashes($className), $placeholder, 1);
             }
         }
 
@@ -453,6 +453,13 @@ class Factory
 
         if ($model->doesNotUseSnakeAttributes()) {
             $body .= $this->class->field('snakeAttributes', false, ['visibility' => 'public static']);
+        }
+
+        if ($model->usesColumnList()) {
+            $properties = array_keys($model->getProperties());
+
+            $body .= "\n";
+            $body .= $this->class->field('columns', $properties);
         }
 
         if ($model->hasCasts()) {
