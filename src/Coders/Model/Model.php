@@ -263,7 +263,7 @@ class Model
         }
 
         // Track attribute casts, ignoring timestamps
-        if ($cast != 'string' && !in_array($propertyName, [$this->CREATED_AT, $this->UPDATED_AT])) {
+        if ($cast != 'string' && $cast !== 'binary' && !in_array($propertyName, [$this->CREATED_AT, $this->UPDATED_AT])) {
             $this->casts[$propertyName] = $cast;
         }
 
