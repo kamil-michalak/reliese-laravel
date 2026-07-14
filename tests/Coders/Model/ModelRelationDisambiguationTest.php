@@ -226,6 +226,62 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * The same column-position ordering must also apply when the
+     * distinguishing column is not the first column of a composite key:
+     * ordering by only the first column (shared "_LigaId") would leave the
+     * constraint-declaration order untouched. Real-world case: `MeczTbl`
+     * again has `HostID` physically before `GuestID`, but here both are the
+     * second column of a composite key shared with `_LigaId`.
+     */
+    public function testDefaultNameFollowsColumnPositionForCompositeKeys()
+    {
+        $guestRelation = new Fluent([
+            'columns' => ['_LigaId', 'GuestID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $hostRelation = new Fluent([
+            'columns' => ['_LigaId', 'HostID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([
+            '_LigaId' => new Fluent(['name' => '_LigaId']),
+            'HostID' => new Fluent(['name' => 'HostID']),
+            'GuestID' => new Fluent(['name' => 'GuestID']),
+        ]);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl_liga_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_LigaId', '_ZespolId']]));
+        // The FK constraint for GuestID is declared first, even though
+        // HostID is the physically earlier column (mocked above).
+        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations);
+        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_liga_tbl'], 1), 'HostID is the physically earlier column, so it should keep the default name.');
+        $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl_liga_tbl_guest'], 1), 'GuestID comes later in the table, so it should be the one disambiguated.');
+    }
+
+    /**
      * Real-world case: `VirtualGuestId`/`VirtualHostId` on
      * `MatchTbl_TeamVirtualTbl`, both referencing `team_virtual_tbl.ID`.
      * The suffix casing ("Id") does not match the referenced primary key's

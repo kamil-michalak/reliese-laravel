@@ -248,13 +248,19 @@ class Model
 
     /**
      * Orders this table's own foreign-key relations by the physical
-     * position of their (first) column in the table, rather than the order
-     * the database happened to list the constraints in (e.g. MySQL's
+     * position of their column(s) in the table, rather than the order the
+     * database happened to list the constraints in (e.g. MySQL's
      * `SHOW CREATE TABLE` lists them in constraint-creation order, which
      * does not necessarily match column order). This keeps which relation
      * "wins" the default name - and which one gets disambiguated - tied to
      * the table's own column layout instead of incidental constraint
      * ordering.
+     *
+     * For a composite foreign key, all of its columns are compared in
+     * order: two relations that share the same first column (e.g. a
+     * composite key that differs only by "host"/"guest" in its second
+     * column) are then ordered by their second column's position, and so
+     * on, rather than only ever looking at the first column.
      *
      * @return \Illuminate\Support\Fluent[]
      */
@@ -264,13 +270,23 @@ class Model
         $columnPositions = array_flip(array_keys($this->blueprint->columns()));
 
         usort($relations, function (Fluent $a, Fluent $b) use ($columnPositions) {
-            $positionA = $columnPositions[$a->columns[0]] ?? PHP_INT_MAX;
-            $positionB = $columnPositions[$b->columns[0]] ?? PHP_INT_MAX;
-
-            return $positionA <=> $positionB;
+            return $this->columnPositionsFor($a, $columnPositions) <=> $this->columnPositionsFor($b, $columnPositions);
         });
 
         return $relations;
+    }
+
+    /**
+     * @param \Illuminate\Support\Fluent $relation
+     * @param int[] $columnPositions
+     *
+     * @return int[]
+     */
+    private function columnPositionsFor(Fluent $relation, array $columnPositions)
+    {
+        return array_map(function ($column) use ($columnPositions) {
+            return $columnPositions[$column] ?? PHP_INT_MAX;
+        }, $relation->columns);
     }
 
     /**
