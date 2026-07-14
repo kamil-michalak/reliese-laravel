@@ -231,7 +231,7 @@ class Model
             return;
         }
 
-        foreach ($this->blueprint->relations() as $relation) {
+        foreach ($this->relationsOrderedByColumnPosition() as $relation) {
             $model = $this->makeRelationModel($relation);
             $belongsTo = new BelongsTo($relation, $this, $model);
             $this->addRelation($belongsTo);
@@ -244,6 +244,33 @@ class Model
                 $this->addRelation($reference);
             }
         }
+    }
+
+    /**
+     * Orders this table's own foreign-key relations by the physical
+     * position of their (first) column in the table, rather than the order
+     * the database happened to list the constraints in (e.g. MySQL's
+     * `SHOW CREATE TABLE` lists them in constraint-creation order, which
+     * does not necessarily match column order). This keeps which relation
+     * "wins" the default name - and which one gets disambiguated - tied to
+     * the table's own column layout instead of incidental constraint
+     * ordering.
+     *
+     * @return \Illuminate\Support\Fluent[]
+     */
+    protected function relationsOrderedByColumnPosition()
+    {
+        $relations = $this->blueprint->relations();
+        $columnPositions = array_flip(array_keys($this->blueprint->columns()));
+
+        usort($relations, function (Fluent $a, Fluent $b) use ($columnPositions) {
+            $positionA = $columnPositions[$a->columns[0]] ?? PHP_INT_MAX;
+            $positionB = $columnPositions[$b->columns[0]] ?? PHP_INT_MAX;
+
+            return $positionA <=> $positionB;
+        });
+
+        return $relations;
     }
 
     /**

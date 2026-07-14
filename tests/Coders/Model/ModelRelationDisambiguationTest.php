@@ -170,6 +170,62 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * The database lists foreign key constraints in the order they were
+     * declared (e.g. MySQL's `SHOW CREATE TABLE`), which does not
+     * necessarily match the physical column order in the table. Real-world
+     * case: `MeczTbl` has `HostID` as the physically first column, followed
+     * by `GuestID`, but the FK constraint for `GuestID` happens to be
+     * declared first. Which relation keeps the default name should follow
+     * the table's own column layout, not the incidental constraint order.
+     */
+    public function testDefaultNameFollowsColumnPositionNotConstraintOrder()
+    {
+        $guestRelation = new Fluent([
+            'columns' => ['GuestID'],
+            'references' => ['ID'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $hostRelation = new Fluent([
+            'columns' => ['HostID'],
+            'references' => ['ID'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([
+            'HostID' => new Fluent(['name' => 'HostID']),
+            'GuestID' => new Fluent(['name' => 'GuestID']),
+        ]);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
+        // The FK constraint for GuestID is declared first, even though
+        // HostID is the physically first column (mocked above).
+        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations);
+        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl']), 'HostID is the physically first column, so it should keep the default name.');
+        $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl_guest']), 'GuestID comes second in the table, so it should be the one disambiguated.');
+    }
+
+    /**
      * Real-world case: `VirtualGuestId`/`VirtualHostId` on
      * `MatchTbl_TeamVirtualTbl`, both referencing `team_virtual_tbl.ID`.
      * The suffix casing ("Id") does not match the referenced primary key's
