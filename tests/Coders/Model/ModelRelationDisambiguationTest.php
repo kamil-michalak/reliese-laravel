@@ -4,6 +4,8 @@ use Illuminate\Support\Fluent;
 use Reliese\Coders\Model\Factory;
 use Reliese\Coders\Model\Model;
 use Reliese\Meta\Blueprint;
+use Reliese\Meta\Schema;
+use Reliese\Meta\SchemaManager;
 
 class ModelRelationDisambiguationTest extends TestCase
 {
@@ -110,6 +112,82 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl']));
         $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_host']));
+    }
+
+    /**
+     * The same collision also happens on the reverse (HasMany) side: e.g.
+     * `sportmonks_fixture_events.sub_type_id` and
+     * `sportmonks_fixture_events.type_id` both reference `sportmonks_type`,
+     * so SportmonksType generated two `sportmonks_fixture_events()` methods.
+     * The first should keep its default name, and the second should be
+     * disambiguated using the existing "Where<Column>" convention already
+     * used by HasMany's foreign_key strategy.
+     */
+    public function testCollidingHasManyRelationsAreDisambiguated()
+    {
+        $parentBlueprint = Mockery::mock(Blueprint::class);
+        $parentBlueprint->shouldReceive('columns')->andReturn([]);
+        $parentBlueprint->shouldReceive('schema')->andReturn('test');
+        $parentBlueprint->shouldReceive('qualifiedTable')->andReturn('test.sportmonks_type');
+        $parentBlueprint->shouldReceive('connection')->andReturn('test');
+        $parentBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
+        $parentBlueprint->shouldReceive('relations')->andReturn([]);
+        $parentBlueprint->shouldReceive('table')->andReturn('sportmonks_type');
+        $parentBlueprint->shouldReceive('is')->andReturnUsing(function ($schema, $table) {
+            return $schema === 'test' && $table === 'sportmonks_type';
+        });
+        $parentBlueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $childBlueprint = Mockery::mock(Blueprint::class);
+        $childBlueprint->shouldReceive('columns')->andReturn([]);
+        $childBlueprint->shouldReceive('schema')->andReturn('test');
+        $childBlueprint->shouldReceive('qualifiedTable')->andReturn('test.sportmonks_fixture_events');
+        $childBlueprint->shouldReceive('connection')->andReturn('test');
+        $childBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
+        $childBlueprint->shouldReceive('table')->andReturn('sportmonks_fixture_events');
+        $childBlueprint->shouldReceive('isUniqueKey')->andReturn(false);
+
+        $subTypeReference = new Fluent([
+            'columns' => ['sub_type_id'],
+            'references' => ['id'],
+            'on' => ['test', 'sportmonks_type'],
+        ]);
+
+        $typeReference = new Fluent([
+            'columns' => ['type_id'],
+            'references' => ['id'],
+            'on' => ['test', 'sportmonks_type'],
+        ]);
+
+        $schema = Mockery::mock(Schema::class);
+        $schema->shouldReceive('referencing')->andReturn([
+            ['blueprint' => $childBlueprint, 'reference' => $subTypeReference],
+            ['blueprint' => $childBlueprint, 'reference' => $typeReference],
+        ]);
+        $schema->shouldReceive('table')->with('sportmonks_fixture_events')->andReturn($childBlueprint);
+
+        $schemaManager = Mockery::mock(SchemaManager::class);
+        $schemaManager->shouldReceive('getIterator')->andReturn(new ArrayIterator([$schema]));
+        $schemaManager->shouldReceive('make')->with('test')->andReturn($schema);
+
+        $factory = new Factory(
+            Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+            Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+            Mockery::mock(\Reliese\Support\Classify::class),
+            new \Reliese\Coders\Model\Config()
+        );
+
+        $schemasProperty = new \ReflectionProperty(Factory::class, 'schemas');
+        $schemasProperty->setAccessible(true);
+        $schemasProperty->setValue($factory, $schemaManager);
+
+        $model = new Model($parentBlueprint, $factory);
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both HasMany relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('sportmonks_fixture_events', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('sportmonks_fixture_events_where_type', $relations, 'The colliding relation should be disambiguated using its own foreign key.');
     }
 
     /**
