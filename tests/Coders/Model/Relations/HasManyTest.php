@@ -45,7 +45,10 @@ class HasManyTest extends TestCase
      */
     public function testNameUsingForeignKeyStrategy($usesSnakeAttributes, $subjectName, $relationName, $primaryKey, $foreignKey, $expected)
     {
-        $relation = Mockery::mock(Fluent::class)->makePartial();
+        $relation = new Fluent([
+            'columns' => [$foreignKey],
+            'references' => [$primaryKey],
+        ]);
 
         $relatedModel = Mockery::mock(Model::class)->makePartial();
         $relatedModel->shouldReceive('getClassName')->andReturn($relationName);
@@ -55,11 +58,7 @@ class HasManyTest extends TestCase
         $subject->shouldReceive('usesSnakeAttributes')->andReturn($usesSnakeAttributes);
         $subject->shouldReceive('getClassName')->andReturn($subjectName);
 
-        /** @var BelongsTo|\Mockery\Mock $relationship */
-        $relationship = Mockery::mock(HasMany::class, [$relation, $subject, $relatedModel])->makePartial();
-        $relationship->shouldAllowMockingProtectedMethods();
-        $relationship->shouldReceive('localKey')->andReturn($primaryKey);
-        $relationship->shouldReceive('foreignKey')->andReturn($foreignKey);
+        $relationship = new HasMany($relation, $subject, $relatedModel);
 
         $this->assertEquals(
             $expected,
@@ -84,7 +83,10 @@ class HasManyTest extends TestCase
      */
     public function testDisambiguatedNameIgnoresConfiguredStrategy($usesSnakeAttributes, $subjectName, $relationName, $primaryKey, $foreignKey, $expected)
     {
-        $relation = Mockery::mock(Fluent::class)->makePartial();
+        $relation = new Fluent([
+            'columns' => [$foreignKey],
+            'references' => [$primaryKey],
+        ]);
 
         $relatedModel = Mockery::mock(Model::class)->makePartial();
         $relatedModel->shouldReceive('getClassName')->andReturn($relationName);
@@ -94,11 +96,7 @@ class HasManyTest extends TestCase
         $subject->shouldReceive('usesSnakeAttributes')->andReturn($usesSnakeAttributes);
         $subject->shouldReceive('getClassName')->andReturn($subjectName);
 
-        /** @var HasMany|\Mockery\Mock $relationship */
-        $relationship = Mockery::mock(HasMany::class, [$relation, $subject, $relatedModel])->makePartial();
-        $relationship->shouldAllowMockingProtectedMethods();
-        $relationship->shouldReceive('localKey')->andReturn($primaryKey);
-        $relationship->shouldReceive('foreignKey')->andReturn($foreignKey);
+        $relationship = new HasMany($relation, $subject, $relatedModel);
 
         $this->assertEquals(
             $expected,

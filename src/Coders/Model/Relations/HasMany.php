@@ -45,10 +45,10 @@ class HasMany extends HasOneOrMany
     {
         switch ($strategy) {
             case 'foreign_key':
-                $relationName = RelationHelper::stripSuffixFromForeignKey(
+                $relationName = RelationHelper::nameFromForeignKeyColumns(
                     $this->parent->usesSnakeAttributes(),
-                    $this->localKey(),
-                    $this->foreignKey()
+                    $this->command->columns,
+                    $this->command->references
                 );
                 if (Str::snake($relationName) === Str::snake($this->parent->getClassName())) {
                     $relationName = Str::plural($this->related->getClassName());

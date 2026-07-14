@@ -76,7 +76,22 @@ abstract class HasOneOrMany implements Relation
             $body .= ', '.Dumper::export($localKey);
         }
 
-        $body .= ');';
+        $body .= ')';
+
+        if ($this->hasCompositeLocalKey()) {
+            // We will assume that when this happens the referenced columns are a composite primary key
+            // or a composite unique key. Otherwise it should be a belongs-to relationship which is not
+            // supported at the moment.
+            foreach ($this->command->references as $index => $column) {
+                $body .= "\n\t\t\t\t\t->where(".
+                    Dumper::export($this->qualifiedLocalKey($index)).
+                    ", '=', ".
+                    Dumper::export($this->qualifiedForeignKey($index)).
+                    ')';
+            }
+        }
+
+        $body .= ';';
 
         return $body;
     }
@@ -97,11 +112,23 @@ abstract class HasOneOrMany implements Relation
     }
 
     /**
+     * @param int $index
+     *
      * @return string
      */
-    protected function foreignKey()
+    protected function foreignKey($index = 0)
     {
-        return $this->command->columns[0];
+        return $this->command->columns[$index];
+    }
+
+    /**
+     * @param int $index
+     *
+     * @return string
+     */
+    protected function qualifiedForeignKey($index = 0)
+    {
+        return $this->related->getTable().'.'.$this->foreignKey($index);
     }
 
     /**
@@ -113,10 +140,32 @@ abstract class HasOneOrMany implements Relation
     }
 
     /**
+     * @param int $index
+     *
      * @return string
      */
-    protected function localKey()
+    protected function localKey($index = 0)
     {
-        return $this->command->references[0];
+        return $this->command->references[$index];
+    }
+
+    /**
+     * @param int $index
+     *
+     * @return string
+     */
+    protected function qualifiedLocalKey($index = 0)
+    {
+        return $this->parent->getTable().'.'.$this->localKey($index);
+    }
+
+    /**
+     * Whether the "local key" is a composite foreign key.
+     *
+     * @return bool
+     */
+    protected function hasCompositeLocalKey()
+    {
+        return count($this->command->references) > 1;
     }
 }

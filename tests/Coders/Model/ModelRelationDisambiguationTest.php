@@ -353,6 +353,99 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * Real-world case: `ZespolTbl_LigaTbl` has two composite-key HasMany
+     * relations back to `MeczTbl`, mirroring the composite BelongsTo case
+     * above from the other side. HasOneOrMany previously only ever looked
+     * at the first composite column (the shared "_LigaId"), which is not
+     * just a naming problem: it also meant the generated body() never
+     * emitted a `->where()` clause for the second column, so both
+     * relations queried on "_LigaId" alone and would return the exact same
+     * (wrong) rows regardless of guest/host.
+     */
+    public function testCollidingCompositeKeyHasManyRelationsAreDisambiguatedWithCorrectWhereClauses()
+    {
+        $parentBlueprint = Mockery::mock(Blueprint::class);
+        $parentBlueprint->shouldReceive('columns')->andReturn([]);
+        $parentBlueprint->shouldReceive('schema')->andReturn('test');
+        $parentBlueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl_liga_tbl');
+        $parentBlueprint->shouldReceive('connection')->andReturn('test');
+        $parentBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_LigaId', '_ZespolId']]));
+        $parentBlueprint->shouldReceive('relations')->andReturn([]);
+        $parentBlueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
+        $parentBlueprint->shouldReceive('is')->andReturnUsing(function ($schema, $table) {
+            return $schema === 'test' && $table === 'zespol_tbl_liga_tbl';
+        });
+        $parentBlueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+        $parentBlueprint->shouldReceive('hasColumn')->andReturn(false);
+
+        $childBlueprint = Mockery::mock(Blueprint::class);
+        $childBlueprint->shouldReceive('columns')->andReturn([]);
+        $childBlueprint->shouldReceive('schema')->andReturn('test');
+        $childBlueprint->shouldReceive('qualifiedTable')->andReturn('test.mecz_tbl');
+        $childBlueprint->shouldReceive('connection')->andReturn('test');
+        $childBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_MatchId']]));
+        $childBlueprint->shouldReceive('table')->andReturn('mecz_tbl');
+        $childBlueprint->shouldReceive('isUniqueKey')->andReturn(false);
+
+        $guestReference = new Fluent([
+            'columns' => ['_LigaId', 'GuestID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $hostReference = new Fluent([
+            'columns' => ['_LigaId', 'HostID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $schema = Mockery::mock(Schema::class);
+        $schema->shouldReceive('referencing')->andReturn([
+            ['blueprint' => $childBlueprint, 'reference' => $guestReference],
+            ['blueprint' => $childBlueprint, 'reference' => $hostReference],
+        ]);
+        $schema->shouldReceive('table')->with('mecz_tbl')->andReturn($childBlueprint);
+
+        $schemaManager = Mockery::mock(SchemaManager::class);
+        $schemaManager->shouldReceive('getIterator')->andReturn(new ArrayIterator([$schema]));
+        $schemaManager->shouldReceive('make')->with('test')->andReturn($schema);
+
+        $factory = new Factory(
+            Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+            Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+            new \Reliese\Support\Classify(),
+            new \Reliese\Coders\Model\Config()
+        );
+
+        $schemasProperty = new \ReflectionProperty(Factory::class, 'schemas');
+        $schemasProperty->setAccessible(true);
+        $schemasProperty->setValue($factory, $schemaManager);
+
+        $model = new Model($parentBlueprint, $factory);
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both HasMany relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('mecz_tbls', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('mecz_tbls_where_host', $relations, 'The colliding relation should be disambiguated using the distinguishing composite column.');
+
+        $bodyMethod = new \ReflectionMethod(Factory::class, 'body');
+        $bodyMethod->setAccessible(true);
+        $body = $bodyMethod->invoke($factory, $model);
+
+        $this->assertStringContainsString(
+            "->where('zespol_tbl_liga_tbl._ZespolId', '=', 'mecz_tbl.GuestID')",
+            $body,
+            'The composite where clause for the guest side must actually filter by GuestID, not just _LigaId.'
+        );
+        $this->assertStringContainsString(
+            "->where('zespol_tbl_liga_tbl._ZespolId', '=', 'mecz_tbl.HostID')",
+            $body,
+            'The composite where clause for the host side must actually filter by HostID, not just _LigaId.'
+        );
+    }
+
+    /**
      * @param \Reliese\Coders\Model\Relation $relation
      * @param int $index
      *

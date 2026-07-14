@@ -54,4 +54,45 @@ class RelationHelper
 
         return $foreignKey;
     }
+
+    /**
+     * Builds a name from one or more foreign key columns. For a composite
+     * foreign key, each column is stripped against its own paired reference
+     * column and the results are joined together. A column that strips down
+     * to nothing meaningful (e.g. one that is identical across sibling
+     * relations, such as a shared "league_id" in a composite key that
+     * otherwise differs by "host"/"guest") carries no distinguishing
+     * information on its own, so a generic "id" suffix is tried as a
+     * fallback before giving up on that column entirely.
+     *
+     * @param bool $usesSnakeAttributes
+     * @param string[] $columns
+     * @param string[] $references
+     * @return string
+     */
+    public static function nameFromForeignKeyColumns($usesSnakeAttributes, array $columns, array $references)
+    {
+        $parts = [];
+
+        foreach ($columns as $index => $column) {
+            $reference = $references[$index] ?? $references[0];
+            $stripped = self::stripSuffixFromForeignKey($usesSnakeAttributes, $reference, $column);
+
+            if ($stripped === $column) {
+                $stripped = self::stripSuffixFromForeignKey($usesSnakeAttributes, 'id', $column);
+            }
+
+            if (trim($stripped, '_') === '') {
+                continue;
+            }
+
+            $parts[] = $stripped;
+        }
+
+        if (empty($parts)) {
+            $parts[] = $columns[0];
+        }
+
+        return implode('_', $parts);
+    }
 }
