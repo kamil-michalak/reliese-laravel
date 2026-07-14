@@ -249,7 +249,7 @@ class Blueprint
     {
         $references = [];
 
-        foreach ($this->relations() as $relation) {
+        foreach ($this->relationsOrderedByOwnColumnPosition() as $relation) {
             list($foreignDatabase, $foreignTable) = array_values($relation->on);
             if ($table->is($foreignDatabase, $foreignTable)) {
                 $references[] = $relation;
@@ -257,6 +257,44 @@ class Blueprint
         }
 
         return $references;
+    }
+
+    /**
+     * Orders this table's own foreign-key relations by the physical
+     * position of their column(s) in this table, rather than the order the
+     * database happened to list the constraints in (e.g. MySQL's
+     * `SHOW CREATE TABLE` lists them in constraint-creation order, which
+     * does not necessarily match column order). This is what determines
+     * which of several relations to the same related table keeps the
+     * default relation name, and which one(s) get disambiguated instead -
+     * so it needs to be tied to this table's own column layout instead of
+     * incidental constraint ordering.
+     *
+     * @return \Illuminate\Support\Fluent[]
+     */
+    public function relationsOrderedByOwnColumnPosition()
+    {
+        $relations = $this->relations();
+        $columnPositions = array_flip(array_keys($this->columns()));
+
+        usort($relations, function (Fluent $a, Fluent $b) use ($columnPositions) {
+            return $this->columnPositionsFor($a, $columnPositions) <=> $this->columnPositionsFor($b, $columnPositions);
+        });
+
+        return $relations;
+    }
+
+    /**
+     * @param \Illuminate\Support\Fluent $relation
+     * @param int[] $columnPositions
+     *
+     * @return int[]
+     */
+    private function columnPositionsFor(Fluent $relation, array $columnPositions)
+    {
+        return array_map(function ($column) use ($columnPositions) {
+            return $columnPositions[$column] ?? PHP_INT_MAX;
+        }, $relation->columns);
     }
 
     /**

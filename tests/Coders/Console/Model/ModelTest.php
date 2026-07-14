@@ -87,6 +87,7 @@ class ModelTest extends TestCase
         $baseBlueprint->shouldReceive('connection')->andReturn('test');
         $baseBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => []]));
         $baseBlueprint->shouldReceive('relations')->andReturn([]);
+        $baseBlueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([]);
         $baseBlueprint->shouldReceive('table')->andReturn('things');
         $baseBlueprint->shouldReceive('column')->andReturn($columnDefinition);
 

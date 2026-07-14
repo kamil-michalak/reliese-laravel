@@ -37,6 +37,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
         $blueprint->shouldReceive('relations')->andReturn([$managerRelation, $mentorRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$managerRelation, $mentorRelation]);
         $blueprint->shouldReceive('table')->andReturn('employees');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -92,6 +93,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_LigaId', '_ZespolId']]));
         $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$guestRelation, $hostRelation]);
         $blueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -145,6 +147,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
         $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$guestRelation, $hostRelation]);
         $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -204,6 +207,9 @@ class ModelRelationDisambiguationTest extends TestCase
         // The FK constraint for GuestID is declared first, even though
         // HostID is the physically first column (mocked above).
         $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        // relationsOrderedByOwnColumnPosition() is what Model actually consults;
+        // it is expected to already reflect the physical column order (HostID first).
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$hostRelation, $guestRelation]);
         $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -260,6 +266,9 @@ class ModelRelationDisambiguationTest extends TestCase
         // The FK constraint for GuestID is declared first, even though
         // HostID is the physically earlier column (mocked above).
         $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        // relationsOrderedByOwnColumnPosition() is what Model actually consults;
+        // it is expected to already reflect the physical column order (HostID first).
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$hostRelation, $guestRelation]);
         $blueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -311,6 +320,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
         $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$guestRelation, $hostRelation]);
         $blueprint->shouldReceive('table')->andReturn('team_virtual_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -365,6 +375,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
         $blueprint->shouldReceive('relations')->andReturn([$managerRelation, $mentorRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$managerRelation, $mentorRelation]);
         $blueprint->shouldReceive('table')->andReturn('employees');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
@@ -406,6 +417,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $parentBlueprint->shouldReceive('connection')->andReturn('test');
         $parentBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
         $parentBlueprint->shouldReceive('relations')->andReturn([]);
+        $parentBlueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([]);
         $parentBlueprint->shouldReceive('table')->andReturn('sportmonks_type');
         $parentBlueprint->shouldReceive('is')->andReturnUsing(function ($schema, $table) {
             return $schema === 'test' && $table === 'sportmonks_type';
@@ -483,6 +495,7 @@ class ModelRelationDisambiguationTest extends TestCase
         $parentBlueprint->shouldReceive('connection')->andReturn('test');
         $parentBlueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_LigaId', '_ZespolId']]));
         $parentBlueprint->shouldReceive('relations')->andReturn([]);
+        $parentBlueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([]);
         $parentBlueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
         $parentBlueprint->shouldReceive('is')->andReturnUsing(function ($schema, $table) {
             return $schema === 'test' && $table === 'zespol_tbl_liga_tbl';
