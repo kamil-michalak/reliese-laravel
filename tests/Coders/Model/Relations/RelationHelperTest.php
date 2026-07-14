@@ -33,6 +33,13 @@ class RelationHelperTest extends TestCase
             [true, 'id', 'valid', 'valid'],
             [true, 'id', 'grid', 'grid'],
             [true, 'id', 'android', 'android'],
+            // The referencing column's suffix casing does not always match
+            // the referenced primary key's own casing (e.g. primary key
+            // "ID" referenced by a "...Id"-suffixed column) - the match
+            // must still succeed as long as the suffix starts with an
+            // uppercase letter.
+            [true, 'ID', 'VirtualHostId', 'VirtualHost'],
+            [true, 'ID', 'VirtualGuestId', 'VirtualGuest'],
         ];
     }
 

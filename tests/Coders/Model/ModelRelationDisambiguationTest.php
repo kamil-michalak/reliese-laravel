@@ -115,6 +115,60 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * Real-world case: `VirtualGuestId`/`VirtualHostId` on
+     * `MatchTbl_TeamVirtualTbl`, both referencing `team_virtual_tbl.ID`.
+     * The suffix casing ("Id") does not match the referenced primary key's
+     * own casing ("ID"), which previously prevented the suffix from being
+     * stripped at all, producing a needlessly verbose
+     * "team_virtual_tbl_virtual_host_id" instead of
+     * "team_virtual_tbl_virtual_host".
+     */
+    public function testCollidingBelongsToRelationsWithMismatchedSuffixCasingAreDisambiguated()
+    {
+        $guestRelation = new Fluent([
+            'columns' => ['VirtualGuestId'],
+            'references' => ['ID'],
+            'on' => ['test', 'team_virtual_tbl'],
+        ]);
+
+        $hostRelation = new Fluent([
+            'columns' => ['VirtualHostId'],
+            'references' => ['ID'],
+            'on' => ['test', 'team_virtual_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.team_virtual_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
+        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('table')->andReturn('team_virtual_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('team_virtual_tbl', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('team_virtual_tbl_virtual_host', $relations, 'The colliding relation should be disambiguated with the suffix cleanly stripped, despite the casing mismatch.');
+
+        $this->assertSame('VirtualGuestId', $this->readForeignKey($relations['team_virtual_tbl']));
+        $this->assertSame('VirtualHostId', $this->readForeignKey($relations['team_virtual_tbl_virtual_host']));
+    }
+
+    /**
      * Model::getRelations() disambiguates colliding relation names, but
      * Factory::body() used to discard that and call $constraint->name()
      * again when generating each method declaration - which always

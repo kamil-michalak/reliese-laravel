@@ -16,9 +16,12 @@ class RelationHelper
      * An underscore-delimited suffix (e.g. "_id") is always a safe word
      * boundary and is stripped regardless of casing. Without an underscore,
      * the suffix is only stripped when it starts with an uppercase letter
-     * (e.g. "HostID", "authorId"), since that is the only signal we have
-     * that it is a real suffix and not just a word that happens to end in
-     * "id" (e.g. "valid", "grid").
+     * (e.g. "HostID", "authorId", "VirtualHostId"), since that is the only
+     * signal we have that it is a real suffix and not just a word that
+     * happens to end in "id" (e.g. "valid", "grid"). The rest of the
+     * suffix is matched case-insensitively, since referencing tables don't
+     * always spell the primary key's name the same way the foreign key
+     * column does (e.g. primary key "ID" referenced by a "...Id" column).
      *
      * @param bool $usesSnakeAttributes
      * @param string $primaryKey
@@ -42,6 +45,13 @@ class RelationHelper
             }
         }
 
-        return preg_replace('/(' . preg_quote($studlyPrimaryKey, '/') . ')$/', '', $foreignKey);
+        $suffixLength = strlen($studlyPrimaryKey);
+        $candidateSuffix = substr($foreignKey, -$suffixLength);
+
+        if (ctype_upper(substr($candidateSuffix, 0, 1)) && strcasecmp($candidateSuffix, $studlyPrimaryKey) === 0) {
+            return substr($foreignKey, 0, -$suffixLength);
+        }
+
+        return $foreignKey;
     }
 }
