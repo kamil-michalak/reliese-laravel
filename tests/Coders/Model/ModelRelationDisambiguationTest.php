@@ -53,10 +53,10 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
         $this->assertArrayHasKey('employee', $relations, 'The first relation should keep its default (related) name.');
-        $this->assertArrayHasKey('mentor', $relations, 'The colliding relation should be disambiguated using its own foreign key.');
+        $this->assertArrayHasKey('employee_mentor', $relations, 'The colliding relation should be disambiguated using the related name plus its own foreign key.');
 
         $this->assertSame('manager_id', $this->readForeignKey($relations['employee']));
-        $this->assertSame('mentor_id', $this->readForeignKey($relations['mentor']));
+        $this->assertSame('mentor_id', $this->readForeignKey($relations['employee_mentor']));
     }
 
     /**
@@ -106,10 +106,10 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
         $this->assertArrayHasKey('zespol_tbl', $relations, 'The first relation should keep its default (related) name.');
-        $this->assertArrayHasKey('host', $relations, 'The colliding relation should be disambiguated using its own foreign key, not a numeric suffix.');
+        $this->assertArrayHasKey('zespol_tbl_host', $relations, 'The colliding relation should be disambiguated using the related name plus its own foreign key, not a numeric suffix.');
 
         $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl']));
-        $this->assertSame('HostID', $this->readForeignKey($relations['host']));
+        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_host']));
     }
 
     /**

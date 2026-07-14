@@ -55,23 +55,41 @@ class BelongsToTest extends TestCase
         );
     }
 
+    public function provideDisambiguatedNamePermutations()
+    {
+        // usesSnakeAttributes, relatedClassName, primaryKey, foreignKey, expected
+        return [
+            // Real-world case: SportmonksCoach has both `country_id` and
+            // `nationality_id`, pointing at SportmonksCountry. The first
+            // keeps the default "sportmonks_country" name; the second
+            // (colliding) one is disambiguated to this.
+            [true, 'SportmonksCountry', 'id', 'nationality_id', 'sportmonks_country_nationality'],
+            [true, 'Employee', 'id', 'mentor_id', 'employee_mentor'],
+            [true, 'ZespolTbl', 'ID', 'HostID', 'zespol_tbl_host'],
+            [false, 'LineManager', 'id', 'deputyManagerId', 'lineManagerDeputyManager'],
+        ];
+    }
+
     /**
-     * disambiguatedName() must always resolve to the foreign-key-based name,
-     * regardless of the configured relation name strategy, since it exists
-     * to disambiguate a relation whose default name is already taken.
+     * disambiguatedName() combines the related model's default name with a
+     * suffix based on the relation's own foreign key, regardless of the
+     * configured relation name strategy, since it exists to disambiguate a
+     * relation whose default name is already taken by another one.
      *
-     * @dataProvider provideForeignKeyStrategyPermutations
+     * @dataProvider provideDisambiguatedNamePermutations
      *
      * @param bool $usesSnakeAttributes
+     * @param string $relatedClassName
      * @param string $primaryKey
      * @param string $foreignKey
      * @param string $expected
      */
-    public function testDisambiguatedNameIgnoresConfiguredStrategy($usesSnakeAttributes, $primaryKey, $foreignKey, $expected)
+    public function testDisambiguatedNameCombinesRelatedAndForeignKeyNames($usesSnakeAttributes, $relatedClassName, $primaryKey, $foreignKey, $expected)
     {
         $relation = Mockery::mock(Fluent::class)->makePartial();
 
         $relatedModel = Mockery::mock(Model::class)->makePartial();
+        $relatedModel->shouldReceive('getClassName')->andReturn($relatedClassName);
 
         $subject = Mockery::mock(Model::class)->makePartial();
         $subject->shouldReceive('getRelationNameStrategy')->andReturn('related');
@@ -86,7 +104,7 @@ class BelongsToTest extends TestCase
         $this->assertEquals(
             $expected,
             $relationship->disambiguatedName(),
-            json_encode(compact('usesSnakeAttributes', 'primaryKey', 'foreignKey'))
+            json_encode(compact('usesSnakeAttributes', 'relatedClassName', 'primaryKey', 'foreignKey'))
         );
     }
 

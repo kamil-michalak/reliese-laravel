@@ -53,11 +53,24 @@ class BelongsTo implements Relation
     }
 
     /**
+     * A name that combines the related model's default name with a suffix
+     * based on this relation's own foreign key (e.g. "sportmonks_country"
+     * + "nationality_id" => "sportmonks_country_nationality"), used to
+     * disambiguate this relation when another relation already claimed its
+     * default name (e.g. two foreign keys pointing to the same table).
+     *
      * @return string
      */
     public function disambiguatedName()
     {
-        return $this->nameForStrategy('foreign_key');
+        $relatedName = $this->nameForStrategy('related');
+        $foreignKeyName = $this->nameForStrategy('foreign_key');
+
+        if ($this->parent->usesSnakeAttributes()) {
+            return $relatedName.'_'.$foreignKeyName;
+        }
+
+        return $relatedName.Str::studly($foreignKeyName);
     }
 
     /**
