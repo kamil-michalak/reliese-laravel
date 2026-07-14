@@ -82,11 +82,7 @@ class BelongsTo implements Relation
     {
         switch ($strategy) {
             case 'foreign_key':
-                $relationName = RelationHelper::stripSuffixFromForeignKey(
-                    $this->parent->usesSnakeAttributes(),
-                    $this->otherKey(),
-                    $this->foreignKey()
-                );
+                $relationName = $this->foreignKeyName();
                 break;
             default:
             case 'related':
@@ -99,6 +95,48 @@ class BelongsTo implements Relation
         }
 
         return Str::camel($relationName);
+    }
+
+    /**
+     * Builds a name from the foreign key column(s). For a composite foreign
+     * key, each column is stripped against its own paired reference column
+     * and the results are joined together. A column that strips down to
+     * nothing meaningful (e.g. one that is identical across sibling
+     * relations, such as a shared "league_id" in a composite key that
+     * otherwise differs by "host"/"guest") carries no distinguishing
+     * information on its own, so a generic "id" suffix is tried as a
+     * fallback before giving up on that column entirely.
+     *
+     * @return string
+     */
+    private function foreignKeyName()
+    {
+        $usesSnakeAttributes = $this->parent->usesSnakeAttributes();
+        $parts = [];
+
+        foreach ($this->command->columns as $index => $column) {
+            $stripped = RelationHelper::stripSuffixFromForeignKey(
+                $usesSnakeAttributes,
+                $this->otherKey($index),
+                $this->foreignKey($index)
+            );
+
+            if ($stripped === $this->foreignKey($index)) {
+                $stripped = RelationHelper::stripSuffixFromForeignKey($usesSnakeAttributes, 'id', $this->foreignKey($index));
+            }
+
+            if (trim($stripped, '_') === '') {
+                continue;
+            }
+
+            $parts[] = $stripped;
+        }
+
+        if (empty($parts)) {
+            $parts[] = $this->foreignKey();
+        }
+
+        return implode('_', $parts);
     }
 
     /**

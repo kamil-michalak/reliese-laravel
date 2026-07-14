@@ -62,6 +62,61 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * Real-world case: `MeczTbl` has two composite-key BelongsTo relations
+     * to `ZespolTbl_LigaTbl`, both matching on the same shared `_LigaId`
+     * column, differing only by the second column (`GuestID`/`HostID`).
+     * Disambiguating using only the first composite column produced a
+     * degenerate suffix (stripping "_LigaId" against itself leaves just an
+     * underscore), yielding a broken double-underscore name like
+     * "zespol_tbl_liga_tbl__". All composite columns must be considered so
+     * the actually-distinguishing column produces a clean name.
+     */
+    public function testCollidingCompositeKeyBelongsToRelationsAreDisambiguated()
+    {
+        $guestRelation = new Fluent([
+            'columns' => ['_LigaId', 'GuestID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $hostRelation = new Fluent([
+            'columns' => ['_LigaId', 'HostID'],
+            'references' => ['_LigaId', '_ZespolId'],
+            'on' => ['test', 'zespol_tbl_liga_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl_liga_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_LigaId', '_ZespolId']]));
+        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('table')->andReturn('zespol_tbl_liga_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('zespol_tbl_liga_tbl', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('zespol_tbl_liga_tbl_host', $relations, 'The colliding relation should be disambiguated using the distinguishing composite column, not a degenerate underscore.');
+
+        $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl_liga_tbl'], 1));
+        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_liga_tbl_host'], 1));
+    }
+
+    /**
      * Real-world case: a legacy schema with PascalCase columns without
      * underscores (e.g. `GuestID` and `HostID`, both referencing
      * `zespol_tbl.ID`), while the model itself uses snake_case attributes.
@@ -299,14 +354,15 @@ class ModelRelationDisambiguationTest extends TestCase
 
     /**
      * @param \Reliese\Coders\Model\Relation $relation
+     * @param int $index
      *
      * @return string
      */
-    private function readForeignKey($relation)
+    private function readForeignKey($relation, $index = 0)
     {
         $property = new \ReflectionProperty($relation, 'command');
         $property->setAccessible(true);
 
-        return $property->getValue($relation)->columns[0];
+        return $property->getValue($relation)->columns[$index];
     }
 }
