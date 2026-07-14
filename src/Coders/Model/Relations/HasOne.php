@@ -34,6 +34,14 @@ class HasOne extends HasOneOrMany
     /**
      * @return string
      */
+    public function disambiguatedName()
+    {
+        return $this->name();
+    }
+
+    /**
+     * @return string
+     */
     public function method()
     {
         return 'hasOne';

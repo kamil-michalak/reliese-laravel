@@ -25,7 +25,25 @@ class HasMany extends HasOneOrMany
      */
     public function name()
     {
-        switch ($this->parent->getRelationNameStrategy()) {
+        return $this->nameForStrategy($this->parent->getRelationNameStrategy());
+    }
+
+    /**
+     * @return string
+     */
+    public function disambiguatedName()
+    {
+        return $this->nameForStrategy('foreign_key');
+    }
+
+    /**
+     * @param string $strategy
+     *
+     * @return string
+     */
+    private function nameForStrategy($strategy)
+    {
+        switch ($strategy) {
             case 'foreign_key':
                 $relationName = RelationHelper::stripSuffixFromForeignKey(
                     $this->parent->usesSnakeAttributes(),

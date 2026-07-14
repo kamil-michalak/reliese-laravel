@@ -234,16 +234,44 @@ class Model
         foreach ($this->blueprint->relations() as $relation) {
             $model = $this->makeRelationModel($relation);
             $belongsTo = new BelongsTo($relation, $this, $model);
-            $this->relations[$belongsTo->name()] = $belongsTo;
+            $this->addRelation($belongsTo);
         }
 
         foreach ($this->factory->referencing($this) as $related) {
             $factory = new ReferenceFactory($related, $this);
             $references = $factory->make();
             foreach ($references as $reference) {
-                $this->relations[$reference->name()] = $reference;
+                $this->addRelation($reference);
             }
         }
+    }
+
+    /**
+     * Registers a relation under its default name, unless that name was
+     * already claimed by a previously registered relation (e.g. two foreign
+     * keys pointing to the same related table). In that case, the relation
+     * being added falls back to a name based on its own foreign key, so
+     * earlier relations keep their default name and later ones are
+     * disambiguated instead of silently overwriting them.
+     *
+     * @param \Reliese\Coders\Model\Relation $relation
+     */
+    protected function addRelation(Relation $relation)
+    {
+        $name = $relation->name();
+
+        if (isset($this->relations[$name]) && $relation->disambiguatedName() !== $name) {
+            $name = $relation->disambiguatedName();
+        }
+
+        $original = $name;
+        $suffix = 2;
+        while (isset($this->relations[$name])) {
+            $name = $original.$suffix;
+            $suffix++;
+        }
+
+        $this->relations[$name] = $relation;
     }
 
     /**

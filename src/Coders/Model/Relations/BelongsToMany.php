@@ -95,6 +95,14 @@ class BelongsToMany implements Relation
     /**
      * @return string
      */
+    public function disambiguatedName()
+    {
+        return $this->name();
+    }
+
+    /**
+     * @return string
+     */
     public function body()
     {
         $body = 'return $this->belongsToMany(';

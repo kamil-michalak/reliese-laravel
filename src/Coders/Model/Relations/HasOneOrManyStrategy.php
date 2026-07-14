@@ -56,6 +56,14 @@ class HasOneOrManyStrategy implements Relation
     /**
      * @return string
      */
+    public function disambiguatedName()
+    {
+        return $this->relation->disambiguatedName();
+    }
+
+    /**
+     * @return string
+     */
     public function body()
     {
         return $this->relation->body();
