@@ -115,6 +115,59 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * Model::getRelations() disambiguates colliding relation names, but
+     * Factory::body() used to discard that and call $constraint->name()
+     * again when generating each method declaration - which always
+     * recomputes the original (colliding) name, regardless of the
+     * disambiguated key the relation was actually stored under. That meant
+     * the generated PHP still declared the same method name twice, even
+     * though Model::getRelations() itself was already correct.
+     */
+    public function testGeneratedMethodBodiesUseDisambiguatedNames()
+    {
+        $managerRelation = new Fluent([
+            'columns' => ['manager_id'],
+            'references' => ['id'],
+            'on' => ['test', 'employees'],
+        ]);
+
+        $mentorRelation = new Fluent([
+            'columns' => ['mentor_id'],
+            'references' => ['id'],
+            'on' => ['test', 'employees'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.employees');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['id']]));
+        $blueprint->shouldReceive('relations')->andReturn([$managerRelation, $mentorRelation]);
+        $blueprint->shouldReceive('table')->andReturn('employees');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
+
+        $factory = new Factory(
+            Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+            Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+            new \Reliese\Support\Classify(),
+            new \Reliese\Coders\Model\Config()
+        );
+
+        $model = new Model($blueprint, $factory);
+
+        $bodyMethod = new \ReflectionMethod(Factory::class, 'body');
+        $bodyMethod->setAccessible(true);
+        $body = $bodyMethod->invoke($factory, $model);
+
+        $this->assertStringContainsString('function employee()', $body);
+        $this->assertStringContainsString('function employee_mentor()', $body);
+        $this->assertSame(1, substr_count($body, 'function employee()'), 'The default name should only be declared once.');
+    }
+
+    /**
      * The same collision also happens on the reverse (HasMany) side: e.g.
      * `sportmonks_fixture_events.sub_type_id` and
      * `sportmonks_fixture_events.type_id` both reference `sportmonks_type`,
