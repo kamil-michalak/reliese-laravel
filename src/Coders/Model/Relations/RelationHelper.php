@@ -71,6 +71,18 @@ class RelationHelper
      * sensible name on its own (e.g. abbreviated or unconventional column
      * names).
      *
+     * A leading underscore surviving the strip (e.g. this schema's
+     * "_ZespolParentId"-style FK columns, which strip down to
+     * "_ZespolParent") is dropped: `Illuminate\Support\Str::snake()`, which
+     * every caller of this method runs its result through, treats a
+     * character immediately before an uppercase letter as a word boundary
+     * and inserts its own separator there regardless of whether one is
+     * already present - so a leading "_" ends up doubled into "__", and
+     * once joined with another part's separator that becomes a stray
+     * triple underscore (e.g. "zespol_tbl___zespol_parent"). The leading
+     * underscore is just this schema's "internal" column-naming
+     * convention, not meaningful in a relation name, so it is safe to drop.
+     *
      * @param bool $usesSnakeAttributes
      * @param string[] $columns
      * @param string[] $references
@@ -85,7 +97,7 @@ class RelationHelper
             $override = self::relationNameFromComment($columnComments[$column] ?? null);
 
             if ($override !== null) {
-                $parts[] = $override;
+                $parts[] = ltrim($override, '_');
                 continue;
             }
 
@@ -100,11 +112,11 @@ class RelationHelper
                 continue;
             }
 
-            $parts[] = $stripped;
+            $parts[] = ltrim($stripped, '_');
         }
 
         if (empty($parts)) {
-            $parts[] = $columns[0];
+            $parts[] = ltrim($columns[0], '_');
         }
 
         return implode('_', $parts);

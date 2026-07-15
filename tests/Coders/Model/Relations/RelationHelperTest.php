@@ -134,4 +134,46 @@ class RelationHelperTest extends TestCase
             )
         );
     }
+
+    /**
+     * Real-world case: `ZespolLogoTbl._ZespolParentId` references
+     * `ZespolTbl.ZespolId`, and strips down to "_ZespolParent" - the
+     * leading underscore is this schema's own "internal FK column"
+     * convention (see also "_LigaId", "_ZespolId"), not a meaningful part
+     * of the name. Left in, `Str::snake('_ZespolParent')` doubles it to
+     * "__zespol_parent" (Str::snake treats the char before an uppercase
+     * letter as a boundary and inserts its own separator regardless of
+     * whether one is already there), which then combined with the
+     * disambiguation separator produced a stray triple-underscore name
+     * like "zespol_tbl___zespol_parent".
+     */
+    public function testNameFromForeignKeyColumnsDropsLeadingUnderscoreFromStrippedColumn()
+    {
+        $this->assertSame(
+            'ZespolParent',
+            RelationHelper::nameFromForeignKeyColumns(
+                true,
+                ['_ZespolParentId'],
+                ['ZespolId']
+            )
+        );
+    }
+
+    /**
+     * The same leading-underscore convention can also appear in an explicit
+     * `{"relation": "..."}` comment override; it should be dropped there
+     * too, for the same reason.
+     */
+    public function testNameFromForeignKeyColumnsDropsLeadingUnderscoreFromCommentOverride()
+    {
+        $this->assertSame(
+            'host',
+            RelationHelper::nameFromForeignKeyColumns(
+                true,
+                ['HostID'],
+                ['ID'],
+                ['HostID' => '{"relation":"_host"}']
+            )
+        );
+    }
 }

@@ -642,6 +642,69 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * Real-world case: `ZespolLogoTbl` has `_ZespolId` (its own primary key,
+     * also a FK to `ZespolTbl.ZespolId`) and `_ZespolParentId` (a second FK
+     * to the same `ZespolTbl.ZespolId`). Modeled here as a self-referencing
+     * table for test simplicity (same pattern as the PascalCase test
+     * above) - the bug is purely about how the FK column names are turned
+     * into a relation name, regardless of whether the related table is
+     * itself or a different one. The disambiguated name used to come out
+     * as "zespol_tbl___zespol_parent" (triple underscore): the leading "_"
+     * this schema's FK columns are conventionally prefixed with survived
+     * the suffix-stripping heuristic, and `Str::snake()` doubled it before
+     * it was joined with the disambiguation separator.
+     */
+    public function testCollidingBelongsToRelationsWithLeadingUnderscoreColumnsAreDisambiguatedWithoutStrayUnderscores()
+    {
+        $zespolIdRelation = new Fluent([
+            'columns' => ['_ZespolId'],
+            'references' => ['ZespolId'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $zespolParentIdRelation = new Fluent([
+            'columns' => ['_ZespolParentId'],
+            'references' => ['ZespolId'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([
+            '_ZespolId' => new Fluent(['name' => '_ZespolId']),
+            '_ZespolParentId' => new Fluent(['name' => '_ZespolParentId']),
+        ]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['_ZespolId']]));
+        $blueprint->shouldReceive('relations')->andReturn([$zespolIdRelation, $zespolParentIdRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$zespolIdRelation, $zespolParentIdRelation]);
+        $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('zespol_tbl', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('zespol_tbl_zespol_parent', $relations, 'The colliding relation should be disambiguated with a single separating underscore, not a stray triple underscore.');
+
+        $this->assertSame('_ZespolId', $this->readForeignKey($relations['zespol_tbl']));
+        $this->assertSame('_ZespolParentId', $this->readForeignKey($relations['zespol_tbl_zespol_parent']));
+    }
+
+    /**
      * @param \Reliese\Coders\Model\Relation $relation
      * @param int $index
      *
