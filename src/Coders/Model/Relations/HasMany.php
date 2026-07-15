@@ -25,14 +25,28 @@ class HasMany extends HasOneOrMany
      */
     public function name()
     {
+        if ($this->hasCommentOverride()) {
+            return $this->formatName($this->foreignKeyName());
+        }
+
         return $this->nameForStrategy($this->parent->getRelationNameStrategy());
     }
 
     /**
+     * A `{"relation": "..."}` comment hint (see `hasCommentOverride()`) is
+     * an explicit, order-independent instruction, so it is used verbatim
+     * here too rather than only as a disambiguation suffix - in practice
+     * `name()` already returns it directly, so this only matters if this
+     * relation still collides with something else despite that.
+     *
      * @return string
      */
     public function disambiguatedName()
     {
+        if ($this->hasCommentOverride()) {
+            return $this->formatName($this->foreignKeyName());
+        }
+
         return $this->nameForStrategy('foreign_key');
     }
 
@@ -45,12 +59,7 @@ class HasMany extends HasOneOrMany
     {
         switch ($strategy) {
             case 'foreign_key':
-                $relationName = RelationHelper::nameFromForeignKeyColumns(
-                    $this->parent->usesSnakeAttributes(),
-                    $this->command->columns,
-                    $this->command->references,
-                    $this->foreignKeyColumnComments()
-                );
+                $relationName = $this->foreignKeyName();
                 if (Str::snake($relationName) === Str::snake($this->parent->getClassName())) {
                     $relationName = Str::plural($this->related->getClassName());
                 } else {
@@ -63,11 +72,42 @@ class HasMany extends HasOneOrMany
                 break;
         }
 
+        return $this->formatName($relationName);
+    }
+
+    /**
+     * @param string $relationName
+     *
+     * @return string
+     */
+    private function formatName($relationName)
+    {
         if ($this->parent->usesSnakeAttributes()) {
             return Str::snake($relationName);
         }
 
         return Str::camel($relationName);
+    }
+
+    /**
+     * @return string
+     */
+    private function foreignKeyName()
+    {
+        return RelationHelper::nameFromForeignKeyColumns(
+            $this->parent->usesSnakeAttributes(),
+            $this->command->columns ?? [],
+            $this->command->references ?? [],
+            $this->foreignKeyColumnComments()
+        );
+    }
+
+    /**
+     * @return bool
+     */
+    private function hasCommentOverride()
+    {
+        return RelationHelper::hasCommentOverride($this->command->columns ?? [], $this->foreignKeyColumnComments());
     }
 
     /**
@@ -87,7 +127,7 @@ class HasMany extends HasOneOrMany
         }
 
         $comments = [];
-        foreach ($this->command->columns as $column) {
+        foreach ($this->command->columns ?? [] as $column) {
             $comments[$column] = $blueprint->hasColumn($column) ? $blueprint->column($column)->comment : null;
         }
 

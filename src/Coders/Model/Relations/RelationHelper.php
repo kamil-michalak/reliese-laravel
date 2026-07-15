@@ -123,6 +123,31 @@ class RelationHelper
     }
 
     /**
+     * Whether any of the given foreign key columns carries a
+     * `{"relation": "..."}` comment hint. Callers use this to decide
+     * whether a relation should skip the usual "first one keeps the
+     * default name, later ones are disambiguated" ordering entirely and
+     * just use the hinted name outright - since the hint is an explicit,
+     * order-independent instruction from whoever annotated the column, not
+     * a fallback that should only kick in when a collision happens to
+     * assign that particular column the "loser" side.
+     *
+     * @param string[] $columns
+     * @param array<string, string|null> $columnComments Comment string keyed by column name.
+     * @return bool
+     */
+    public static function hasCommentOverride(array $columns, array $columnComments = [])
+    {
+        foreach ($columns as $column) {
+            if (self::relationNameFromComment($columnComments[$column] ?? null) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * A column's DB comment can carry a `{"relation": "..."}` JSON hint to
      * explicitly name the relation this foreign key column produces,
      * overriding the stripped-suffix heuristic. This is meant as an escape

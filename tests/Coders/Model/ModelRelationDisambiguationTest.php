@@ -185,16 +185,29 @@ class ModelRelationDisambiguationTest extends TestCase
      * the hint instead of the (perfectly fine, but here deliberately
      * different) heuristic result.
      */
-    public function testCollidingBelongsToRelationsUseCommentOverrideWhenPresent()
+    /**
+     * A `{"relation": "..."}` comment hint is an explicit, order-independent
+     * instruction: it must win regardless of whether its column happens to
+     * be processed first or second. Real-world bug this guards against:
+     * `HostID` (with a `{"relation":"home_side"}` hint) is the physically
+     * *first* column, so it used to keep the plain default name
+     * ("zespol_tbl") - since the comment was only ever consulted while
+     * building the *disambiguated* name for whichever column lost the
+     * "first come, first served" ordering - and the hint on `HostID` was
+     * silently ignored. Now the hint always wins outright: `HostID` is
+     * named "home_side", which also means `GuestID` no longer needs any
+     * suffix at all, since "zespol_tbl" is free once `HostID` stops using it.
+     */
+    public function testCollidingBelongsToRelationsUseCommentOverrideRegardlessOfColumnOrder()
     {
-        $guestRelation = new Fluent([
-            'columns' => ['GuestID'],
+        $hostRelation = new Fluent([
+            'columns' => ['HostID'],
             'references' => ['ID'],
             'on' => ['test', 'zespol_tbl'],
         ]);
 
-        $hostRelation = new Fluent([
-            'columns' => ['HostID'],
+        $guestRelation = new Fluent([
+            'columns' => ['GuestID'],
             'references' => ['ID'],
             'on' => ['test', 'zespol_tbl'],
         ]);
@@ -206,8 +219,9 @@ class ModelRelationDisambiguationTest extends TestCase
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
         $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
-        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
-        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('relations')->andReturn([$hostRelation, $guestRelation]);
+        // HostID is physically the first column, so it is processed first.
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$hostRelation, $guestRelation]);
         $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
         $blueprint->shouldReceive('is')->andReturn(true);
         $blueprint->shouldReceive('column')->with('HostID')->andReturn(new Fluent([
@@ -229,12 +243,12 @@ class ModelRelationDisambiguationTest extends TestCase
         $relations = $model->getRelations();
 
         $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
-        $this->assertArrayHasKey('zespol_tbl', $relations, 'The first relation should keep its default (related) name.');
-        $this->assertArrayHasKey('zespol_tbl_home_side', $relations, 'The colliding relation should be named after the comment hint, not the stripped-suffix heuristic.');
-        $this->assertArrayNotHasKey('zespol_tbl_host', $relations, 'The heuristic-derived name should not be used once a comment hint is present.');
+        $this->assertArrayHasKey('home_side', $relations, 'The commented column should be named after its hint outright, even though it was processed first.');
+        $this->assertArrayHasKey('zespol_tbl', $relations, 'The uncommented column should get the plain default name, since the hinted relation no longer occupies it.');
+        $this->assertArrayNotHasKey('zespol_tbl_host', $relations, 'The heuristic-derived suffix should never be produced once a comment hint is present.');
 
+        $this->assertSame('HostID', $this->readForeignKey($relations['home_side']));
         $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl']));
-        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_home_side']));
     }
 
     /**

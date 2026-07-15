@@ -49,6 +49,10 @@ class BelongsTo implements Relation
      */
     public function name()
     {
+        if ($this->hasCommentOverride()) {
+            return $this->formatName($this->foreignKeyName());
+        }
+
         return $this->nameForStrategy($this->parent->getRelationNameStrategy());
     }
 
@@ -59,10 +63,20 @@ class BelongsTo implements Relation
      * disambiguate this relation when another relation already claimed its
      * default name (e.g. two foreign keys pointing to the same table).
      *
+     * A `{"relation": "..."}` comment hint (see `hasCommentOverride()`) is
+     * an explicit, order-independent instruction, so it is used verbatim
+     * here too rather than only as a disambiguation suffix - in practice
+     * `name()` already returns it directly, so this only matters if this
+     * relation still collides with something else despite that.
+     *
      * @return string
      */
     public function disambiguatedName()
     {
+        if ($this->hasCommentOverride()) {
+            return $this->formatName($this->foreignKeyName());
+        }
+
         $relatedName = $this->nameForStrategy('related');
         $foreignKeyName = $this->nameForStrategy('foreign_key');
 
@@ -90,6 +104,16 @@ class BelongsTo implements Relation
                 break;
         }
 
+        return $this->formatName($relationName);
+    }
+
+    /**
+     * @param string $relationName
+     *
+     * @return string
+     */
+    private function formatName($relationName)
+    {
         if ($this->parent->usesSnakeAttributes()) {
             return Str::snake($relationName);
         }
@@ -104,10 +128,18 @@ class BelongsTo implements Relation
     {
         return RelationHelper::nameFromForeignKeyColumns(
             $this->parent->usesSnakeAttributes(),
-            $this->command->columns,
-            $this->command->references,
+            $this->command->columns ?? [],
+            $this->command->references ?? [],
             $this->foreignKeyColumnComments()
         );
+    }
+
+    /**
+     * @return bool
+     */
+    private function hasCommentOverride()
+    {
+        return RelationHelper::hasCommentOverride($this->command->columns ?? [], $this->foreignKeyColumnComments());
     }
 
     /**
@@ -126,7 +158,7 @@ class BelongsTo implements Relation
         }
 
         $comments = [];
-        foreach ($this->command->columns as $column) {
+        foreach ($this->command->columns ?? [] as $column) {
             $comments[$column] = $blueprint->hasColumn($column) ? $blueprint->column($column)->comment : null;
         }
 
