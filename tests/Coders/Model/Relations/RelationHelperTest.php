@@ -59,4 +59,79 @@ class RelationHelperTest extends TestCase
             json_encode(compact('usesSnakeAttributes', 'primaryKey', 'foreignKey'))
         );
     }
+
+    public function provideComments()
+    {
+        return [
+            'valid JSON with a relation hint' => ['{"relation":"host"}', 'host'],
+            'valid JSON with other keys plus a relation hint' => ['{"alias":"HostTeamId","relation":"host"}', 'host'],
+            'valid JSON without a relation key' => ['{"alias":"HostTeamId"}', null],
+            'valid JSON with an empty relation value' => ['{"relation":""}', null],
+            'plain text comment, not JSON' => ['Host team of the match', null],
+            'empty comment' => ['', null],
+            'null comment' => [null, null],
+            'JSON scalar, not an object' => ['"host"', null],
+        ];
+    }
+
+    /**
+     * @dataProvider provideComments
+     *
+     * @param string|null $comment
+     * @param string|null $expected
+     */
+    public function testRelationNameFromComment($comment, $expected)
+    {
+        $this->assertSame($expected, RelationHelper::relationNameFromComment($comment));
+    }
+
+    /**
+     * A column's `{"relation": "..."}` comment hint should be used verbatim
+     * instead of the stripped-suffix heuristic, since it exists precisely
+     * for the columns the heuristic can't name well on its own (e.g.
+     * abbreviated names like `HostID`/`GuestID`).
+     */
+    public function testNameFromForeignKeyColumnsUsesCommentOverrideWhenPresent()
+    {
+        $this->assertSame(
+            'host',
+            RelationHelper::nameFromForeignKeyColumns(
+                true,
+                ['HostID'],
+                ['ID'],
+                ['HostID' => '{"relation":"host"}']
+            )
+        );
+    }
+
+    /**
+     * A comment override on one column of a composite foreign key should
+     * only affect that column's part of the name; the other column still
+     * falls back to the stripped-suffix heuristic.
+     */
+    public function testNameFromForeignKeyColumnsMixesCommentOverrideWithHeuristicForCompositeKeys()
+    {
+        $this->assertSame(
+            'Team_host',
+            RelationHelper::nameFromForeignKeyColumns(
+                true,
+                ['TeamId', 'HostID'],
+                ['id', 'ID'],
+                ['HostID' => '{"relation":"host"}']
+            )
+        );
+    }
+
+    public function testNameFromForeignKeyColumnsFallsBackToHeuristicWithoutAComment()
+    {
+        $this->assertSame(
+            'Host',
+            RelationHelper::nameFromForeignKeyColumns(
+                true,
+                ['HostID'],
+                ['ID'],
+                ['HostID' => null]
+            )
+        );
+    }
 }

@@ -65,16 +65,30 @@ class RelationHelper
      * information on its own, so a generic "id" suffix is tried as a
      * fallback before giving up on that column entirely.
      *
+     * A column whose DB comment carries a `{"relation": "..."}` JSON hint
+     * (see `relationNameFromComment()`) uses that verbatim instead of the
+     * stripped suffix, for the cases where the heuristic can't produce a
+     * sensible name on its own (e.g. abbreviated or unconventional column
+     * names).
+     *
      * @param bool $usesSnakeAttributes
      * @param string[] $columns
      * @param string[] $references
+     * @param array<string, string|null> $columnComments Comment string keyed by column name.
      * @return string
      */
-    public static function nameFromForeignKeyColumns($usesSnakeAttributes, array $columns, array $references)
+    public static function nameFromForeignKeyColumns($usesSnakeAttributes, array $columns, array $references, array $columnComments = [])
     {
         $parts = [];
 
         foreach ($columns as $index => $column) {
+            $override = self::relationNameFromComment($columnComments[$column] ?? null);
+
+            if ($override !== null) {
+                $parts[] = $override;
+                continue;
+            }
+
             $reference = $references[$index] ?? $references[0];
             $stripped = self::stripSuffixFromForeignKey($usesSnakeAttributes, $reference, $column);
 
@@ -94,5 +108,31 @@ class RelationHelper
         }
 
         return implode('_', $parts);
+    }
+
+    /**
+     * A column's DB comment can carry a `{"relation": "..."}` JSON hint to
+     * explicitly name the relation this foreign key column produces,
+     * overriding the stripped-suffix heuristic. This is meant as an escape
+     * hatch for columns the heuristic can't name well on its own (e.g.
+     * `HostID`/`GuestID`-style abbreviations), without having to keep
+     * growing the heuristic's regex rules for every such case.
+     *
+     * @param string|null $comment
+     * @return string|null
+     */
+    public static function relationNameFromComment($comment)
+    {
+        if (empty($comment)) {
+            return null;
+        }
+
+        $decoded = json_decode($comment, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded) || empty($decoded['relation'])) {
+            return null;
+        }
+
+        return $decoded['relation'];
     }
 }

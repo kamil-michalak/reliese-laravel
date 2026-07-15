@@ -32,6 +32,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $blueprint = Mockery::mock(Blueprint::class);
         $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.employees');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -88,6 +89,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $blueprint = Mockery::mock(Blueprint::class);
         $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl_liga_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -142,6 +144,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $blueprint = Mockery::mock(Blueprint::class);
         $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -173,6 +176,68 @@ class ModelRelationDisambiguationTest extends TestCase
     }
 
     /**
+     * A column can carry a `{"relation": "..."}` JSON hint in its DB
+     * comment to explicitly name the relation it produces, overriding the
+     * stripped-suffix heuristic. This is meant as an escape hatch for
+     * columns the heuristic can't name well on its own - it is tested here
+     * using the same `HostID`/`GuestID` collision as the test above, but
+     * with `HostID` annotated so the disambiguated relation is named after
+     * the hint instead of the (perfectly fine, but here deliberately
+     * different) heuristic result.
+     */
+    public function testCollidingBelongsToRelationsUseCommentOverrideWhenPresent()
+    {
+        $guestRelation = new Fluent([
+            'columns' => ['GuestID'],
+            'references' => ['ID'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $hostRelation = new Fluent([
+            'columns' => ['HostID'],
+            'references' => ['ID'],
+            'on' => ['test', 'zespol_tbl'],
+        ]);
+
+        $blueprint = Mockery::mock(Blueprint::class);
+        $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(true);
+        $blueprint->shouldReceive('schema')->andReturn('test');
+        $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
+        $blueprint->shouldReceive('connection')->andReturn('test');
+        $blueprint->shouldReceive('primaryKey')->andReturn(new Fluent(['columns' => ['ID']]));
+        $blueprint->shouldReceive('relations')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('relationsOrderedByOwnColumnPosition')->andReturn([$guestRelation, $hostRelation]);
+        $blueprint->shouldReceive('table')->andReturn('zespol_tbl');
+        $blueprint->shouldReceive('is')->andReturn(true);
+        $blueprint->shouldReceive('column')->with('HostID')->andReturn(new Fluent([
+            'nullable' => true,
+            'comment' => '{"relation":"home_side"}',
+        ]));
+        $blueprint->shouldReceive('column')->with('GuestID')->andReturn(new Fluent(['nullable' => true]));
+
+        $model = new Model(
+            $blueprint,
+            new Factory(
+                Mockery::mock(\Illuminate\Database\DatabaseManager::class),
+                Mockery::mock(\Illuminate\Filesystem\Filesystem::class),
+                Mockery::mock(\Reliese\Support\Classify::class),
+                new \Reliese\Coders\Model\Config()
+            )
+        );
+
+        $relations = $model->getRelations();
+
+        $this->assertCount(2, $relations, 'Both relations should be generated instead of one overwriting the other.');
+        $this->assertArrayHasKey('zespol_tbl', $relations, 'The first relation should keep its default (related) name.');
+        $this->assertArrayHasKey('zespol_tbl_home_side', $relations, 'The colliding relation should be named after the comment hint, not the stripped-suffix heuristic.');
+        $this->assertArrayNotHasKey('zespol_tbl_host', $relations, 'The heuristic-derived name should not be used once a comment hint is present.');
+
+        $this->assertSame('GuestID', $this->readForeignKey($relations['zespol_tbl']));
+        $this->assertSame('HostID', $this->readForeignKey($relations['zespol_tbl_home_side']));
+    }
+
+    /**
      * The database lists foreign key constraints in the order they were
      * declared (e.g. MySQL's `SHOW CREATE TABLE`), which does not
      * necessarily match the physical column order in the table. Real-world
@@ -200,6 +265,7 @@ class ModelRelationDisambiguationTest extends TestCase
             'HostID' => new Fluent(['name' => 'HostID']),
             'GuestID' => new Fluent(['name' => 'GuestID']),
         ]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -259,6 +325,7 @@ class ModelRelationDisambiguationTest extends TestCase
             'HostID' => new Fluent(['name' => 'HostID']),
             'GuestID' => new Fluent(['name' => 'GuestID']),
         ]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.zespol_tbl_liga_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -315,6 +382,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $blueprint = Mockery::mock(Blueprint::class);
         $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.team_virtual_tbl');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -370,6 +438,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $blueprint = Mockery::mock(Blueprint::class);
         $blueprint->shouldReceive('columns')->andReturn([]);
+        $blueprint->shouldReceive('hasColumn')->andReturn(false);
         $blueprint->shouldReceive('schema')->andReturn('test');
         $blueprint->shouldReceive('qualifiedTable')->andReturn('test.employees');
         $blueprint->shouldReceive('connection')->andReturn('test');
@@ -426,6 +495,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $childBlueprint = Mockery::mock(Blueprint::class);
         $childBlueprint->shouldReceive('columns')->andReturn([]);
+        $childBlueprint->shouldReceive('hasColumn')->andReturn(false);
         $childBlueprint->shouldReceive('schema')->andReturn('test');
         $childBlueprint->shouldReceive('qualifiedTable')->andReturn('test.sportmonks_fixture_events');
         $childBlueprint->shouldReceive('connection')->andReturn('test');
@@ -505,6 +575,7 @@ class ModelRelationDisambiguationTest extends TestCase
 
         $childBlueprint = Mockery::mock(Blueprint::class);
         $childBlueprint->shouldReceive('columns')->andReturn([]);
+        $childBlueprint->shouldReceive('hasColumn')->andReturn(false);
         $childBlueprint->shouldReceive('schema')->andReturn('test');
         $childBlueprint->shouldReceive('qualifiedTable')->andReturn('test.mecz_tbl');
         $childBlueprint->shouldReceive('connection')->andReturn('test');

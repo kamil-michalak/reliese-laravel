@@ -105,8 +105,32 @@ class BelongsTo implements Relation
         return RelationHelper::nameFromForeignKeyColumns(
             $this->parent->usesSnakeAttributes(),
             $this->command->columns,
-            $this->command->references
+            $this->command->references,
+            $this->foreignKeyColumnComments()
         );
+    }
+
+    /**
+     * Comment string of each of this relation's own foreign key columns,
+     * keyed by column name, so RelationHelper can look for a `"relation"`
+     * naming override (see RelationHelper::relationNameFromComment()).
+     *
+     * @return array<string, string|null>
+     */
+    private function foreignKeyColumnComments()
+    {
+        $blueprint = $this->parent->getBlueprint();
+
+        if (! $blueprint) {
+            return [];
+        }
+
+        $comments = [];
+        foreach ($this->command->columns as $column) {
+            $comments[$column] = $blueprint->hasColumn($column) ? $blueprint->column($column)->comment : null;
+        }
+
+        return $comments;
     }
 
     /**
